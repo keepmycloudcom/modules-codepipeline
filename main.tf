@@ -234,6 +234,11 @@ resource "aws_iam_role_policy_attachment" "code_build_vpc_read_only" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess"
 }
 
+resource "aws_iam_role_policy_attachment" "code_secret_manager" {
+  role       = aws_iam_role.code_build.name
+  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
+}
+
 resource "aws_iam_role" "code_build" {
   path = "/service-role/"
   name = "${var.name}-container-build"
