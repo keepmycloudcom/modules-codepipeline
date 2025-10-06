@@ -9,63 +9,21 @@ variable "repo_name" { type = string }
 variable "ecs_cluster" { type = string }
 variable "codestar_conector" { type = string }
 variable "service_name" { type = string }
-variable "port" { 
-  type = string
-  default = "8080"
-}
-variable "build_path" { 
-  type = string
-  default = "."
-}
-variable "dockerfile_path" { 
-  type = string
-  default = "./Dockerfile"
-}
-variable "context" { 
-  type = string
-  default = "backend"
-}
-variable "compute_type" { 
-  type = string
+
+variable "compute_type" {
+  type    = string
   default = "BUILD_GENERAL1_SMALL"
 }
 variable "secret_environment" {
   type    = list(object({ name = string, value = string }))
   default = [{ name = "test", value = "test" }]
 }
-variable "detect_changes" { 
-  type = bool
+variable "detect_changes" {
+  type    = bool
   default = true
 }
 # code pipeline
 
-resource "aws_secretsmanager_secret_version" "codebuild_env_version" {
-  secret_id     = aws_secretsmanager_secret.codebuild_env.id
-  secret_string = jsonencode({ "SERVICE_NAME" : "${var.service_name}", "STAND" : "${var.project_env}", "ENVIRONMENT" : "${var.project_env}", "AWS_ACCOUNT_ID" : "${var.aws_account}", "AWS_DEFAULT_REGION" : "${var.aws_region}", "IMAGE_REPO_NAME" : "${var.name}","CONTEXT" : "${var.context}", "BUILD_PATH" : "${var.build_path}", "DOCKERFILE_PATH" : "${var.dockerfile_path}", "PORT" : "${var.port}" })
-}
-resource "aws_secretsmanager_secret" "codebuild_env" {
-  name        = "${var.project_env}/${var.project_name}/build/${var.service_name}"
-  description = "Secrets for CodeBuild project ${var.name}"
-  #kms_key_id  = "alias/aws/secretsmanager"
-}
-
-### Get secrets from AWS Secrets store 
-data "aws_secretsmanager_secret" "secrets" {
-  arn = aws_secretsmanager_secret.codebuild_env.arn
-}
-
-data "aws_secretsmanager_secret_version" "current" {
-  secret_id = data.aws_secretsmanager_secret.secrets.id
-}
-
-locals {
-  task_environment = [
-    for k, v in jsondecode(data.aws_secretsmanager_secret_version.current.secret_string) : {
-      name  = k
-      value = v
-    }
-  ]
-}
 
 resource "aws_codepipeline" "container_pipeline" {
   name     = var.name
@@ -105,7 +63,7 @@ resource "aws_codepipeline" "container_pipeline" {
       category = "Build"
       owner    = "AWS"
       configuration = {
-        EnvironmentVariables = jsonencode(local.task_environment)
+        EnvironmentVariables = jsonencode(var.secret_environment)
         ProjectName          = "${var.name}-container-build"
       }
       input_artifacts = [
@@ -147,6 +105,7 @@ resource "aws_s3_bucket" "codepipeline_artifacts" {
   versioning {
     enabled = true
   }
+
   lifecycle_rule {
     enabled = true
     id      = "codepipeline-artifacts"
@@ -232,6 +191,11 @@ resource "aws_iam_role_policy_attachment" "code_build_ecr_power_user" {
 resource "aws_iam_role_policy_attachment" "code_build_vpc_read_only" {
   role       = aws_iam_role.code_build.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonVPCReadOnlyAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "code_secret_manager" {
+  role       = aws_iam_role.code_build.name
+  policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
 }
 
 resource "aws_iam_role" "code_build" {
@@ -481,7 +445,7 @@ resource "aws_codebuild_project" "container_build" {
     type = "CODEPIPELINE"
   }
   environment {
-    compute_type                = "${var.compute_type}"
+    compute_type                = var.compute_type
     image                       = "aws/codebuild/standard:7.0"
     type                        = "LINUX_CONTAINER"
     privileged_mode             = true
