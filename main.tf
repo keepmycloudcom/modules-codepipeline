@@ -103,7 +103,7 @@ resource "aws_s3_bucket" "codepipeline_artifacts" {
   force_destroy = true
   acl = "private"
   versioning {
-    enabled = true
+    enabled = false
   }
 
   lifecycle_rule {
