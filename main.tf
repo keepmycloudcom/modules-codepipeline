@@ -99,11 +99,11 @@ resource "aws_codepipeline" "container_pipeline" {
 }
 #s3 bucket for codepipeline artifacts
 resource "aws_s3_bucket" "codepipeline_artifacts" {
-  bucket = "${var.name}-build-artifacts"
-
-  acl = "private"
+  bucket        = "${var.name}-build-artifacts"
+  force_destroy = true
+  acl           = "private"
   versioning {
-    enabled = true
+    enabled = false
   }
 
   lifecycle_rule {
